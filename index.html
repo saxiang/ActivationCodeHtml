@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- 关键：添加viewport，避免移动端解析异常，同时让浏览器严格按标准解析 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <title>后台登录</title>
+  <!-- 引入Element Plus样式（放在head里，避免样式加载延迟） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.4.2/dist/index.css">
+  <style>
+    .login-container {
+      width: 400px;
+      margin: 100px auto;
+      padding: 20px;
+      border: 1px solid #e6e6e6;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="login-container">
+    <el-form ref="loginForm" :model="loginForm" :rules="rules" label-width="80px">
+      <el-form-item label="用户名" prop="username">
+        <el-input v-model="loginForm.username"></el-input>
+      </el-form-item>
+      <el-form-item label="密码" prop="password">
+        <el-input v-model="loginForm.password" type="password"></el-input>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="login">登录</el-button>
+      </el-form-item>
+    </el-form>
+  </div>
+
+  <!-- 按顺序引入依赖：先Vue，再Element Plus，最后axios（避免依赖顺序错误） -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.3.8/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/element-plus@2.4.2/dist/index.full.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+
+  <script>
+// 确保Vue和Element Plus全局可用
+const { createApp } = Vue;
+const app = createApp({
+  data() {
+    return {
+      loginForm: {
+        username: "admin",
+        password: "123456"
+      },
+      rules: {
+        username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+        password: [{ required: true, message: "请输入密码", trigger: "blur" }]
+      }
+    };
+  },
+  methods: {
+    async login() {
+  try {
+    // Form传参（和后端Form(...)匹配，避免JSON解析坑）
+    const formData = new URLSearchParams();
+    formData.append("username", this.loginForm.username.trim());
+    formData.append("password", this.loginForm.password.trim());
+    
+    const res = await axios.post("http://192.168.3.111:8000/login", formData, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded" // 显式指定Form格式
+      }
+    });
+    
+    // 保存token并跳转
+    localStorage.setItem("token", res.data.access_token);
+    window.location.href = "/src/manage.html";
+  } catch (err) {
+    console.error("登录失败：", err.response?.data?.detail || err.message);
+    window.ElMessage.error(err.response?.data?.detail || "登录失败（账号/密码错误）");
+  }
+}
+  }
+});
+// 全局注册Element Plus（确保所有组件可用）
+app.use(ElementPlus);
+// 挂载后，手动将ElMessage挂载到window（兜底方案）
+app.mount("#app");
+window.ElMessage = ElementPlus.ElMessage;
+  </script>
+</body>
+</html>
