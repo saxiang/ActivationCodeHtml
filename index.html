@@ -71,7 +71,7 @@ const app = createApp({
     
     // 保存token并跳转
     localStorage.setItem("token", res.data.access_token);
-    window.location.href = "/src/manage.html";
+   window.location.href = "/manage.html"; 
   } catch (err) {
     console.error("登录失败：", err.response?.data?.detail || err.message);
     window.ElMessage.error(err.response?.data?.detail || "登录失败（账号/密码错误）");

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- 核心：优化移动端视口（解决缩放/适配问题） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+  <title>激活码管理系统</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.4.2/dist/index.css">
+  <style>
+    /* 全局重置：解决移动端默认样式 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-size: 14px; /* 移动端基础字体 */
+      line-height: 1.5;
+      background-color: #ffffff;
+    }
+    /* 容器适配：移动端占满宽度，PC端最大宽度 */
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px;
+      background-color: #fdfbfb;
+      min-height: 100vh;
+    }
+    /* 头部适配：PC端横向分布，移动端换行+居中 */
+    .header {
+      display: flex;
+      flex-wrap: wrap; /* 移动端按钮换行 */
+      justify-content: center; /* 移动端居中 */
+      align-items: center;
+      margin-bottom: 15px;
+      gap: 10px; /* 统一间距 */
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    .header h1 {
+      font-size: 18px; /* 移动端标题缩小 */
+      flex: 1 1 100%; /* 标题独占一行 */
+      text-align: center;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .header .el-button {
+      padding: 8px 12px; /* 移动端按钮缩小 */
+      font-size: 13px;
+    }
+    /* 表格容器：移动端横向滚动（核心！解决表格列过多溢出） */
+    .table-container {
+      width: 100%;
+      overflow-x: auto; /* 横向滚动 */
+      -webkit-overflow-scrolling: touch; /* iOS顺滑滚动 */
+      margin: 10px 0;
+    }
+    /* 表格样式适配 */
+    .el-table {
+      min-width: 800px; /* 保证表格列不挤压 */
+      font-size: 13px; /* 移动端表格字体缩小 */
+    }
+    .el-table th, .el-table td {
+      padding: 8px 5px !important; /* 单元格内边距缩小 */
+    }
+    /* 弹窗适配：移动端占90%宽度 */
+    .el-dialog {
+      width: 90% !important;
+      margin: 0 auto !important;
+      top: 20px !important;
+    }
+    .el-dialog__body {
+      padding: 15px !important;
+    }
+    /* 表单适配：移动端输入框优化 */
+    .dialog-form {
+      padding: 5px 0;
+    }
+    .form-item {
+      margin-bottom: 15px;
+    }
+    .el-input, .el-textarea {
+      font-size: 14px;
+    }
+    /* 分页适配：移动端居中和缩小 */
+    .el-pagination {
+      margin-top: 15px;
+      text-align: center !important;
+      font-size: 13px;
+    }
+    .el-pagination .el-pager li {
+      padding: 0 8px;
+    }
+    /* 复制按钮适配：移动端样式优化 */
+    .copy-btn {
+      cursor: pointer;
+      color: #1989fa;
+      text-decoration: underline;
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin: 0;
+      font-size: 13px;
+      font-family: inherit;
+      line-height: inherit;
+    }
+    /* 解密结果适配 */
+    .decrypt-result {
+      margin: 10px 0;
+      padding: 10px;
+      border: 1px solid #e6e6e6;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    /* PC端样式覆盖（大屏恢复原有布局） */
+    @media (min-width: 768px) {
+      .container {
+        padding: 20px;
+        margin: 20px auto;
+      }
+      .header {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+      .header h1 {
+        flex: none;
+        font-size: 24px;
+        margin-bottom: 0;
+        text-align: left;
+      }
+      .el-table {
+        min-width: 100%;
+        font-size: 14px;
+      }
+      .el-table th, .el-table td {
+        padding: 12px 8px !important;
+      }
+      .el-dialog {
+        width: 450px !important;
+      }
+      .copy-btn {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="container">
+    <!-- 头部按钮 -->
+    <div class="header">
+      <h1>激活码管理系统</h1>
+      <el-button type="primary" @click="openGenerateDialog">生成激活码</el-button>
+      <el-button type="warning" @click="openResetDialog">重置激活码</el-button>
+      <el-button type="success" @click="openDecryptDialog">解密激活码</el-button>
+      <el-button type="danger" @click="logout">退出登录</el-button>
+    </div>
+
+    <!-- 激活码列表：新增横向滚动容器（核心适配） -->
+<div class="table-container">
+  <el-table :data="codeList" border style="width: 100%;" v-loading="loading">
+    <el-table-column label="加密激活码" min-width="200">
+      <template #default="scope">
+        <!-- 优化复制按钮：添加class+长按提示 -->
+        <button 
+          class="copy-btn"
+          @click.stop="copyCode(scope.row.code)"
+          title="点击/长按复制激活码"
+        >
+          {{ scope.row.code }}
+        </button>
+        </span>
+      </template>
+    </el-table-column>
+    <!-- 修复：prop改回raw_data（和后端返回字段一致），列名保留“手机号码” -->
+    <el-table-column prop="raw_data" label="手机号码" min-width="120"></el-table-column>
+    <el-table-column prop="is_activated" label="状态" width="100">
+      <template #default="scope">
+        <el-tag v-if="scope.row.is_activated" type="danger">已激活</el-tag>
+        <el-tag v-else type="success">未激活</el-tag>
+      </template>
+    </el-table-column>
+    <el-table-column label="激活时间" width="180">
+      <template #default="scope">
+        <span v-if="scope.row.activate_time">
+          {{ scope.row.activate_time.split('.')[0] }}
+        </span>
+        <span v-else style="color: #999;">未激活</span>
+      </template>
+    </el-table-column>
+    <el-table-column prop="create_time" label="创建时间" width="180"></el-table-column>
+  </el-table>
+</div>
+
+    <!-- 分页 -->
+    <el-pagination
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      :current-page="page"
+      :page-sizes="[5, 10, 20]" 
+      :page-size="size"
+      layout="total, sizes, prev, pager, next, jumper"
+      :total="total"
+      style="margin-top: 10px;"
+    ></el-pagination>
+
+    <!-- 生成激活码弹窗 -->
+    <el-dialog
+      v-model="generateDialogVisible"
+      title="生成加密激活码"
+      :before-close="handleDialogClose"  
+    >
+      <el-form
+        ref="generateFormRef"
+        :model="generateForm"
+        :rules="generateRules"
+        class="dialog-form"
+      >
+        <el-form-item label="产品编号（3位数字）" prop="product_id" class="form-item">
+          <el-input
+            v-model="generateForm.product_id"
+            placeholder="请输入3位数字产品编号（如123）"
+            clearable
+            maxlength="3"
+            show-word-limit
+          ></el-input>
+        </el-form-item>
+        <el-form-item label="手机号码（11位数字）" prop="phone" class="form-item">
+          <el-input
+            v-model="generateForm.phone"
+            placeholder="请输入11位手机号码（如13800138000）"
+            clearable
+            maxlength="11"
+            show-word-limit
+            type="tel"
+          ></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="generateDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitGenerateForm">生成激活码</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 重置激活码弹窗 -->
+    <el-dialog
+      v-model="resetDialogVisible"
+      title="重置激活码"
+      :before-close="resetResetForm"
+    >
+      <el-form
+        ref="resetFormRef"
+        :model="resetForm"
+        :rules="resetRules"
+        class="dialog-form"
+      >
+        <el-form-item label="加密激活码" prop="code" class="form-item">
+          <el-input
+            v-model="resetForm.code"
+            placeholder="请输入需要重置状态的加密激活码"
+            clearable
+            type="textarea"
+            rows="2" 
+          ></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="resetResetForm">取消</el-button>
+        <el-button type="warning" @click="submitResetForm">确认重置</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 解密激活码弹窗 -->
+    <el-dialog
+      v-model="decryptDialogVisible"
+      title="解密激活码"
+      :before-close="resetDecryptForm"
+    >
+      <el-form
+        ref="decryptFormRef"
+        :model="decryptForm"
+        :rules="decryptRules"
+        class="dialog-form"
+      >
+        <el-form-item label="加密激活码" prop="code" class="form-item">
+          <el-input
+            v-model="decryptForm.code"
+            placeholder="请输入需要解密的激活码"
+            clearable
+            type="textarea"
+            rows="2" 
+          ></el-input>
+        </el-form-item>
+      </el-form>
+      <!-- 解密结果展示 -->
+      <div v-if="decryptResult" class="decrypt-result">
+        <h4 style="margin: 0 0 8px 0; color: #1989fa; font-size: 15px;">解密结果：</h4>
+        <div>产品编号：{{ decryptResult.product_id }}</div>
+        <div>手机号码：{{ decryptResult.phone }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="resetDecryptForm">取消</el-button>
+        <el-button type="success" @click="submitDecryptForm">解密</el-button>
+      </template>
+    </el-dialog>
+  </div>
+
+  <!-- 引入依赖 -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.3.8/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/element-plus@2.4.2/dist/index.full.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+
+  <script>
+    const { createApp, ref, onMounted, nextTick } = Vue;
+    const ElementPlus = window.ElementPlus;
+    const ElMessage = ElementPlus.ElMessage;
+    const ElMessageBox = ElementPlus.ElMessageBox;
+
+    // 前端加密函数（和后端一致）
+    function encryptCode(productId, phone) {
+      const rawStr = productId + phone;
+      const firstB64 = btoa(unescape(encodeURIComponent(rawStr)));
+      const saltedStr = firstB64 + "9527";
+      const finalCode = btoa(unescape(encodeURIComponent(saltedStr)));
+      return finalCode;
+    }
+
+    // 前端解密函数
+    function decryptCode(encryptCode) {
+      try {
+        const secondDecode = decodeURIComponent(escape(atob(encryptCode)));
+        if (!secondDecode.endsWith("9527")) throw new Error("无加盐标识");
+        const firstB64 = secondDecode.slice(0, -4);
+        const rawStr = decodeURIComponent(escape(atob(firstB64)));
+        if (rawStr.length < 3) throw new Error("数据过短");
+        return { productId: rawStr.slice(0, 3), phone: rawStr.slice(3) };
+      } catch (e) {
+        throw new Error(`解密失败：${e.message}`);
+      }
+    }
+
+    createApp({
+      setup() {
+        // 表单Ref
+        const generateFormRef = ref(null);
+        const resetFormRef = ref(null);
+        const decryptFormRef = ref(null);
+
+        // 响应式数据
+        const codeList = ref([]);
+        const page = ref(1);
+        const size = ref(10); // 移动端默认每页10条（更少滚动）
+        const total = ref(0);
+        const loading = ref(false);
+
+        // 生成弹窗
+        const generateDialogVisible = ref(false);
+        const generateForm = ref({ product_id: "", phone: "" });
+        const generateRules = ref({
+          product_id: [
+            { required: true, message: "请输入3位数字产品编号", trigger: "blur" },
+            { pattern: /^\d{3}$/, message: "产品编号必须为3位数字", trigger: "blur" }
+          ],
+          phone: [
+            { required: true, message: "请输入11位手机号码", trigger: "blur" },
+            { pattern: /^\d{11}$/, message: "手机号码必须为11位数字", trigger: "blur" }
+          ]
+        });
+
+        // 重置弹窗
+        const resetDialogVisible = ref(false);
+        const resetForm = ref({ code: "" });
+        const resetRules = ref({
+          code: [{ required: true, message: "请输入需要重置的加密激活码", trigger: "blur" }]
+        });
+
+        // 解密弹窗
+        const decryptDialogVisible = ref(false);
+        const decryptForm = ref({ code: "" });
+        const decryptRules = ref({
+          code: [{ required: true, message: "请输入需要解密的激活码", trigger: "blur" }]
+        });
+        const decryptResult = ref(null);
+
+        // 获取激活码列表
+        const getCodes = async () => {
+          loading.value = true;
+          try {
+            const res = await axios.get("http://activationcodeserver.onrender.com/get_codes", {
+              params: { page: page.value, size: size.value }
+            });
+            codeList.value = res.data.list || [];
+            total.value = res.data.total || 0;
+          } catch (err) {
+            ElMessage.error("获取列表失败：" + (err.message || "网络错误"));
+            codeList.value = [];
+            total.value = 0;
+          } finally {
+            loading.value = false;
+          }
+        };
+
+        // 生成弹窗 - 打开
+        const openGenerateDialog = () => {
+          generateDialogVisible.value = true;
+          nextTick(() => {
+            if (generateFormRef.value) generateFormRef.value.resetFields();
+            generateForm.value = { product_id: "", phone: "" };
+          });
+        };
+
+        // 生成弹窗 - 关闭
+        const handleDialogClose = () => {
+          generateDialogVisible.value = false;
+          nextTick(() => {
+            if (generateFormRef.value) generateFormRef.value.resetFields();
+            generateForm.value = { product_id: "", phone: "" };
+          });
+        };
+
+        // 生成弹窗 - 提交
+        const submitGenerateForm = async () => {
+          if (!generateFormRef.value) {
+            ElMessage.error("表单加载失败，请关闭弹窗重新打开");
+            return;
+          }
+          try {
+            await generateFormRef.value.validate();
+          } catch (invalidFields) {
+            const firstError = Object.keys(invalidFields)[0];
+            const errorMsg = firstError === "product_id" 
+              ? "产品编号必须为3位数字" 
+              : "手机号码必须为11位数字";
+            ElMessage.warning(errorMsg);
+            return;
+          }
+          try {
+            const formData = new URLSearchParams();
+            formData.append("product_id", generateForm.value.product_id);
+            formData.append("phone", generateForm.value.phone);
+            const res = await axios.post("http://activationcodeserver.onrender.com/generate_codes", formData);
+            ElMessage.success(`激活码生成成功：${res.data.code}`);
+            generateDialogVisible.value = false;
+            getCodes();
+          } catch (err) {
+            ElMessage.error("生成失败：" + (err.response?.data?.detail || err.message));
+          }
+        };
+
+        // 重置弹窗 - 打开
+        const openResetDialog = () => {
+          resetDialogVisible.value = true;
+          nextTick(() => {
+            if (resetFormRef.value) resetFormRef.value.resetFields();
+            resetForm.value = { code: "" };
+          });
+        };
+
+        // 重置弹窗 - 关闭
+        const resetResetForm = () => {
+          resetDialogVisible.value = false;
+          resetForm.value = { code: "" };
+          if (resetFormRef.value) resetFormRef.value.resetFields();
+        };
+
+        // 重置弹窗 - 提交
+        const submitResetForm = async () => {
+          if (!resetFormRef.value) {
+            ElMessage.error("表单加载失败，请关闭弹窗重新打开");
+            return;
+          }
+          try {
+            await resetFormRef.value.validate();
+          } catch (e) {
+            ElMessage.warning("请输入需要重置的加密激活码");
+            return;
+          }
+          try {
+            await ElMessageBox.confirm(
+              `确定要重置激活码【${resetForm.value.code}】的状态为未激活吗？`,
+              "最终确认",
+              { confirmButtonText: "确定", cancelButtonText: "取消", type: "warning" }
+            );
+            const formData = new URLSearchParams();
+            formData.append("code", resetForm.value.code);
+            const res = await axios.post("http://activationcodeserver.onrender.com/reset_activation", formData);
+            ElMessage.success(res.data.msg);
+            resetDialogVisible.value = false;
+            getCodes();
+          } catch (err) {
+            if (err !== "cancel") {
+              ElMessage.error("重置失败：" + (err.response?.data?.detail || err.message));
+            }
+          }
+        };
+
+        // 解密弹窗 - 打开
+        const openDecryptDialog = () => {
+          decryptDialogVisible.value = true;
+          nextTick(() => {
+            if (decryptFormRef.value) decryptFormRef.value.resetFields();
+            decryptForm.value = { code: "" };
+            decryptResult.value = null;
+          });
+        };
+
+        // 解密弹窗 - 关闭
+        const resetDecryptForm = () => {
+          decryptDialogVisible.value = false;
+          decryptForm.value = { code: "" };
+          decryptResult.value = null;
+        };
+
+        // 解密弹窗 - 提交
+        const submitDecryptForm = async () => {
+          if (!decryptFormRef.value) {
+            ElMessage.error("表单加载失败，请关闭弹窗重新打开");
+            return;
+          }
+          try {
+            await decryptFormRef.value.validate();
+          } catch (e) {
+            ElMessage.warning("请输入需要解密的激活码");
+            return;
+          }
+          try {
+            const formData = new URLSearchParams();
+            formData.append("code", decryptForm.value.code);
+            const res = await axios.post("http://activationcodeserver.onrender.com/decrypt_code", formData);
+            decryptResult.value = { product_id: res.data.product_id, phone: res.data.phone };
+            ElMessage.success("解密成功！");
+          } catch (err) {
+            decryptResult.value = null;
+            ElMessage.error("解密失败：" + (err.response?.data?.detail || err.message));
+          }
+        };
+
+        // 复制激活码（iPhone终极适配版）
+        const copyCode = (code) => {
+          if (!code) {
+            ElMessage.error("激活码为空，无法复制！");
+            return;
+          }
+          // iOS Safari 特殊处理：优先用原生长按复制，兜底模拟
+          try {
+            // 方案1：尝试剪贴板API（PC/安卓）
+            if (navigator.clipboard && !/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+              navigator.clipboard.writeText(code).then(() => {
+                ElMessage.success("激活码已复制到剪贴板！");
+              }).catch(() => {
+                throw new Error("剪贴板API失败");
+              });
+            } else {
+              // 方案2：iOS专用textarea模拟
+              const textarea = document.createElement('textarea');
+              textarea.value = code;
+              textarea.style.position = 'fixed';
+              textarea.style.top = '50%';
+              textarea.style.left = '50%';
+              textarea.style.width = '200px';
+              textarea.style.height = '50px';
+              textarea.style.opacity = '0.01';
+              textarea.style.zIndex = '999999';
+              document.body.appendChild(textarea);
+              // iOS必须先聚焦再选中
+              textarea.focus();
+              textarea.setSelectionRange(0, code.length);
+              const success = document.execCommand('copy');
+              document.body.removeChild(textarea);
+              if (success) {
+                ElMessage.success("激活码已复制到剪贴板！");
+              } else {
+                throw new Error("执行复制命令失败");
+              }
+            }
+          } catch (err) {
+            // 兜底：提示手动复制
+            ElMessage.warning(`复制失败，请长按激活码手动复制：${code}`);
+            console.error("复制失败：", err);
+          }
+        };
+
+        // 退出登录
+        const logout = () => {
+          localStorage.removeItem("token");
+          window.location.href = "/";
+        };
+
+        // 分页
+        const handleSizeChange = (val) => {
+          size.value = val;
+          getCodes();
+        };
+        const handleCurrentChange = (val) => {
+          page.value = val;
+          getCodes();
+        };
+
+        // 初始化
+        onMounted(() => {
+          if (!localStorage.getItem("token")) {
+            window.location.href = "/";
+            return;
+          }
+          getCodes();
+        });
+
+        return {
+          codeList, page, size, total, loading,
+          generateDialogVisible, generateFormRef, generateForm, generateRules,
+          resetDialogVisible, resetFormRef, resetForm, resetRules,
+          decryptDialogVisible, decryptFormRef, decryptForm, decryptRules, decryptResult,
+          getCodes, openGenerateDialog, handleDialogClose, submitGenerateForm,
+          openResetDialog, resetResetForm, submitResetForm,
+          openDecryptDialog, resetDecryptForm, submitDecryptForm,
+          copyCode, logout, handleSizeChange, handleCurrentChange
+        };
+      }
+    }).use(ElementPlus).mount("#app");
+  </script>
+</body>
+</html>
