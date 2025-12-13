@@ -388,7 +388,7 @@
         const getCodes = async () => {
           loading.value = true;
           try {
-            const res = await axios.get("http://activationcodeserver.onrender.com/get_codes", {
+            const res = await axios.get("https://activationcodeserver.onrender.com/get_codes", {
               params: { page: page.value, size: size.value }
             });
             codeList.value = res.data.list || [];
@@ -440,7 +440,7 @@
             const formData = new URLSearchParams();
             formData.append("product_id", generateForm.value.product_id);
             formData.append("phone", generateForm.value.phone);
-            const res = await axios.post("http://activationcodeserver.onrender.com/generate_codes", formData);
+            const res = await axios.post("https://activationcodeserver.onrender.com/generate_codes", formData);
             ElMessage.success(`激活码生成成功：${res.data.code}`);
             generateDialogVisible.value = false;
             getCodes();
@@ -485,7 +485,7 @@
             );
             const formData = new URLSearchParams();
             formData.append("code", resetForm.value.code);
-            const res = await axios.post("http://activationcodeserver.onrender.com/reset_activation", formData);
+            const res = await axios.post("https://activationcodeserver.onrender.com/reset_activation", formData);
             ElMessage.success(res.data.msg);
             resetDialogVisible.value = false;
             getCodes();
@@ -528,7 +528,7 @@
           try {
             const formData = new URLSearchParams();
             formData.append("code", decryptForm.value.code);
-            const res = await axios.post("http://activationcodeserver.onrender.com/decrypt_code", formData);
+            const res = await axios.post("https://activationcodeserver.onrender.com/decrypt_code", formData);
             decryptResult.value = { product_id: res.data.product_id, phone: res.data.phone };
             ElMessage.success("解密成功！");
           } catch (err) {
