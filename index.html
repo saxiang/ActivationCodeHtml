@@ -63,7 +63,7 @@ const app = createApp({
     formData.append("username", this.loginForm.username.trim());
     formData.append("password", this.loginForm.password.trim());
     
-    const res = await axios.post("https://activationcodeserver.onrender.com/login", formData, {
+    const res = await axios.post("https://3guys.com.cn/login", formData, {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded" // 显式指定Form格式
       }
