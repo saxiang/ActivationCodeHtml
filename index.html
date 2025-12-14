@@ -56,28 +56,43 @@ const app = createApp({
     };
   },
   methods: {
-    async login() {
-  try {
-    // Form传参（和后端Form(...)匹配，避免JSON解析坑）
-    const formData = new URLSearchParams();
-    formData.append("username", this.loginForm.username.trim());
-    formData.append("password", this.loginForm.password.trim());
-    
-    const res = await axios.post("https://3guys.com.cn/login", formData, {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded" // 显式指定Form格式
+  async login() {
+    // 1. 前端先校验：账号/密码为空，直接提示，不发请求
+    const username = this.loginForm.username.trim();
+    const password = this.loginForm.password.trim();
+    if (!username || !password) {
+      window.ElMessage.error("请输入账号和密码！");
+      return; // 终止流程，不发请求
+    }
+
+    try {
+      // 2. 构造Form参数（保持你的格式不变）
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+      
+      const res = await axios.post("https://3guys.com.cn/login", formData, {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      });
+      
+      // 3. 核心校验：必须有 access_token 才跳转（否则抛错进catch）
+      if (!res.data || !res.data.access_token) {
+        throw new Error(res.data?.detail || "登录失败，未获取到token");
       }
-    });
-    
-    // 保存token并跳转
-    localStorage.setItem("token", res.data.access_token);
-   window.location.href = "/manage.html"; 
-  } catch (err) {
-    console.error("登录失败：", err.response?.data?.detail || err.message);
-    window.ElMessage.error(err.response?.data?.detail || "登录失败（账号/密码错误）");
+
+      // 4. 只有校验通过，才保存token+跳转
+      localStorage.setItem("token", res.data.access_token);
+      window.location.href = "/manage.html"; 
+    } catch (err) {
+      // 5. 所有失败场景（空值/无token/密码错/网络错）都走这里
+      const errorMsg = err.response?.data?.detail || err.message || "账号或密码错误";
+      console.error("登录失败：", errorMsg);
+      window.ElMessage.error(errorMsg);
+    }
   }
 }
-  }
 });
 // 全局注册Element Plus（确保所有组件可用）
 app.use(ElementPlus);
